@@ -7,9 +7,9 @@ import re
 from collections import defaultdict
 from itertools import product
 from typing import Union, Tuple
+from datetime import datetime
 
 import commentjson
-import toml
 from github import Github
 from termcolor import colored
 
@@ -104,7 +104,7 @@ def refresh_cdn_task(task_cdn: Tuple[str, Union[CloudFlareCDN, CTCDN, OtterCloud
                             'https://s3.ffxiv.wang/xivlauncher-cn/XIVLauncherCN-win-Setup.exe', 'https://s3.ffxiv.wang/xivlauncher-cn/XIVLauncherCN-beta-Setup.exe',
                             'https://s3.ffxiv.wang/xivlauncher-cn/XIVLauncherCN-win-Portable.7z', 'https://s3.ffxiv.wang/xivlauncher-cn/XIVLauncherCN-beta-Portable.7z'],
             'updater': ['/Updater/Release/VersionInfo', '/Updater/ChangeLog'],
-            'xlassets': ['/XLAssets/integrity','https://s3.ffxiv.wang/xlassets/patchinfo/latest.json'],
+            'xlassets': ['/XLAssets/integrity', 'https://s3.ffxiv.wang/xlassets/patchinfo/latest.json'],
         }
         if task in path_map:
             cdn.purge(path_map[task])
@@ -129,58 +129,36 @@ DEFAULT_META = {
 }
 
 
-def regen_pluginmaster(redis_client=None, repo_url: str = ''):
-    logger.info("Start regenerating pluginmaster.")
-    settings = get_settings()
-    if not redis_client:
-        redis_client = Redis.create_client()
-    if not repo_url:
-        repo_url = settings.plugin_repo
-    is_dip17 = True  # default to be using dip17
+def parsing_pluginmaster(redis_client, settings, repo_url, plugin_list=None) -> tuple[list[dict], list[str], str]:
+    if plugin_list is None:
+        plugin_list = list()
+    plugin_list_length = len(plugin_list)
     (_, repo_name) = get_user_repo_name(repo_url)
     (_, repo) = update_git_repo(repo_url)
     branch = repo.active_branch.name
     plugin_namespace = f"plugin-{repo_name}-{branch}"
     logger.info(f"plugin_namespace: {plugin_namespace}")
     plugin_repo_dir = get_repo_dir(repo_url)
-    cahnnel_map = {
+    pluginmaster = []
+    plugin_name_list = []
+    channel_map = {
         'stable': 'stable',
         'testing': 'testing-live'
     }
-    if repo_name == 'DalamudPlugins':  # old plugin dist repo
-        cahnnel_map = {
-            'stable': 'plugins',
-            'testing': 'testing'
-        }
-        is_dip17 = False
-    pluginmaster = []
-    stable_dir = os.path.join(plugin_repo_dir, cahnnel_map['stable'])
-    testing_dir = os.path.join(plugin_repo_dir, cahnnel_map['testing'])
+    jsonc = commentjson
+    stable_dir = os.path.join(plugin_repo_dir, channel_map['stable'])
+    testing_dir = os.path.join(plugin_repo_dir, channel_map['testing'])
     if not os.path.exists(testing_dir):
         os.mkdir(testing_dir)
-    jsonc = commentjson
-    # Load categories
-    category_tags = defaultdict(list)
-    category_path = os.path.join(settings.root_path, 'app/utils/categoryfallbacks.json')
-    if os.path.exists(category_path):
-        with codecs.open(category_path, "r", "utf8") as f:
-            category_tags.update(jsonc.load(f))
+
     # Load last update time
     last_updated = {}
-    if not is_dip17:
-        legacy_pluginmaster = []
-        legacy_pluginmaster_path = os.path.join(plugin_repo_dir, 'pluginmaster.json')
-        with codecs.open(legacy_pluginmaster_path, 'r', 'utf8') as f:
-            legacy_pluginmaster = jsonc.load(f)
-        for legacy_meta in legacy_pluginmaster:
-            last_updated[legacy_meta['InternalName']] = int(legacy_meta['LastUpdated'])
-    else:
-        state_path = os.path.join(plugin_repo_dir, 'State.toml')
-        with codecs.open(state_path, 'r', 'utf8') as f:
-            state = toml.load(f)
-        for (channel, channel_meta) in state['channels'].items():
-            for (plugin, plugin_meta) in channel_meta['plugins'].items():
-                last_updated[plugin] = int(plugin_meta['time_built'].timestamp())
+    state_path = os.path.join(plugin_repo_dir, 'state.json')
+    with codecs.open(state_path, 'r', 'utf8') as f:
+        state = json.load(f)
+    for (channel, channel_meta) in state['Channels'].items():
+        for (plugin, plugin_meta) in channel_meta['Plugins'].items():
+            last_updated[plugin] = int(datetime.fromisoformat(re.sub(r'(\.\d{6})\d+(?=[+-]\d{2}:\d{2}$)', r'\1', plugin_meta['TimeBuilt'])).timestamp())
     # Generate pluginmaster
     for plugin_dir in [stable_dir, testing_dir]:
         for plugin in os.listdir(plugin_dir):
@@ -197,6 +175,11 @@ def regen_pluginmaster(redis_client=None, repo_url: str = ''):
                 except Exception as e:
                     logger.error(f"Cannot parse plugin meta file for {plugin}")
                     continue
+            api_level = int(plugin_meta.get("DalamudApiLevel", 0))
+            if api_level != settings.plugin_api_level and api_level != settings.plugin_api_level_test:
+                continue
+            if plugin_list_length > 0 and plugin in plugin_list:
+                continue
             for key, value in DEFAULT_META.items():
                 if key not in plugin_meta:
                     plugin_meta[key] = value
@@ -204,11 +187,9 @@ def regen_pluginmaster(redis_client=None, repo_url: str = ''):
             plugin_meta["IsTestingExclusive"] = is_testing
             if is_testing:
                 plugin_meta["TestingAssemblyVersion"] = plugin_meta["AssemblyVersion"]
-            api_level = int(plugin_meta.get("DalamudApiLevel", 0))
             download_count = redis_client.hget(f'{settings.redis_prefix}plugin-count', plugin) or 0
             plugin_meta["DownloadCount"] = int(download_count)
             plugin_meta["LastUpdate"] = last_updated.get(plugin, plugin_meta.get("LastUpdate", 0))
-            plugin_meta["CategoryTags"] = category_tags[plugin]
             plugin_meta["DownloadLinkInstall"] = settings.hosted_url.rstrip('/') \
                                                  + '/Plugin/Download/' + f"{plugin}?isUpdate=False&isTesting=False&branch=api{api_level}"
             plugin_meta["DownloadLinkUpdate"] = settings.hosted_url.rstrip('/') \
@@ -221,8 +202,27 @@ def regen_pluginmaster(redis_client=None, repo_url: str = ''):
             plugin_name = f"{plugin}-testing" if is_testing else plugin
             redis_client.hset(f'{settings.redis_prefix}{plugin_namespace}', plugin_name, hashed_name)
             pluginmaster.append(plugin_meta)
+            plugin_name_list.append(plugin)
+
+    return pluginmaster, plugin_name_list, plugin_namespace
+
+
+def regen_pluginmaster(redis_client=None, repo_url: str = ''):
+    logger.info("Start regenerating pluginmaster.")
+    settings = get_settings()
+    if not redis_client:
+        redis_client = Redis.create_client()
+    if not repo_url:
+        repo_url = settings.plugin_repo
+
+    repo_url_goatcorp = settings.plugin_repo_goatcorp
+
+    pluginmaster_cn, plugin_name_list_cn, plugin_namespace = parsing_pluginmaster(redis_client, settings, repo_url)
+    pluginmaster, _, _ = parsing_pluginmaster(redis_client, settings, repo_url_goatcorp, plugin_name_list_cn)
+    pluginmaster += pluginmaster_cn
+
     redis_client.hset(f'{settings.redis_prefix}{plugin_namespace}', 'pluginmaster', json.dumps(pluginmaster))
-    plugin_name_list =[]
+    plugin_name_list = []
     for plugin in pluginmaster:
         plugin_name = plugin['InternalName']
         plugin_name_list.append(plugin_name)

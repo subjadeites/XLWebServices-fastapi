@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     dalamud_format: str = 'zip'  # zip or 7z
     asset_repo: str = ''
     plugin_repo: str = ''
+    plugin_repo_goatcorp: str = 'https://github.com/goatcorp/PluginDistD17.git'
     xlassets_repo: str = ''
     plugin_api_level: int = 7
     plugin_api_level_test: int = 8

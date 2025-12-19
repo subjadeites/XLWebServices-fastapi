@@ -21,7 +21,10 @@ def get_user_repo_name(git_url: str):
 
 def get_repo_dir(git_url: str):
     settings = get_settings()
-    (_, repo_name) = get_user_repo_name(git_url)
+    if git_url == settings.plugin_repo:
+        repo_name = "PluginDistD17_ottercorp"
+    else:
+        (_, repo_name) = get_user_repo_name(git_url)
     repo_root_dir = os.path.join(settings.root_path, settings.repo_cache_dir)
     repo_dir = os.path.join(repo_root_dir, repo_name)
     if not os.path.exists(repo_dir) or not os.path.isdir(repo_dir):
