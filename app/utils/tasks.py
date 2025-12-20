@@ -176,7 +176,7 @@ def parsing_pluginmaster(redis_client, settings, repo_url, plugin_list=None) -> 
                     logger.error(f"Cannot parse plugin meta file for {plugin}")
                     continue
             api_level = int(plugin_meta.get("DalamudApiLevel", 0))
-            if api_level != settings.plugin_api_level and api_level != settings.plugin_api_level_test:
+            if settings.plugin_api_level - api_level <= 1:
                 continue
             if plugin_list_length > 0 and plugin in plugin_list:
                 continue
