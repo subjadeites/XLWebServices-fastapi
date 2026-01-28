@@ -206,7 +206,10 @@ async def front_admin_flush_cache_get(request: Request, task: str | None = None)
 async def front_admin_flush_stg_code(request: Request):
     stg_code = flush_stg_code()
     flash(request, 'success', f'刷新Stg Code已完成，新的key为 {stg_code}')
-    return RedirectResponse(url=request.app.url_path_for("front_admin_index"), status_code=303)
+    if request.headers.get('referer') and 'flush' in request.headers.get('referer'):
+        return RedirectResponse(url=request.app.url_path_for("front_admin_flush_get"), status_code=303)
+    else:
+        return RedirectResponse(url=request.app.url_path_for("front_admin_index"), status_code=303)
 
 
 # endregion
