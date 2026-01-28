@@ -44,8 +44,6 @@ class Settings(BaseSettings):
     ga_api_secret: str = ''
     # Plogon
     plogon_api_key: str = ''
-    # stg code
-    stg_code: str = ''
     # ottercloud cdn
     ottercloud_cdn_host: str = ''
     ottercloud_cdn_id: str = ''

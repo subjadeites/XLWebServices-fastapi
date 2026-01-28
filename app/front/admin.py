@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.config import Settings
 from app.utils.cdn.ottercloudcdn import OtterCloudCDN
-from app.utils.common import get_settings
+from app.utils.common import get_settings, flush_stg_code
 from app.utils.dalamud_log_analysis import analysis
 from app.utils.front import flash
 from app.utils.redis import RedisFeedBack
@@ -66,6 +66,12 @@ async def front_admin_restart():
 @router.get('/update_svr')
 async def front_admin_update():
     await run_command("update_XLWeb")
+    return
+
+
+@router.get('/stg_code')
+async def front_admin_stg_code(request: Request):
+    flash(request, 'info', f'Stg Code为{Settings.stg_code}')
     return
 
 
@@ -192,6 +198,13 @@ async def front_admin_flush_cache_get(request: Request, task: str | None = None)
         return RedirectResponse(url=request.app.url_path_for("front_admin_flush_get"), status_code=303)
     else:
         return RedirectResponse(url=request.app.url_path_for("front_admin_index"), status_code=303)
+
+
+@router.get('/flush_stg_code')
+async def front_admin_flush_stg_code(request: Request):
+    stg_code = flush_stg_code()
+    flash(request, 'success', f'刷新Stg Code已完成，新的key为{stg_code}')
+    return RedirectResponse(url=request.app.url_path_for("front_admin_index"), status_code=303)
 
 
 # endregion
