@@ -14,7 +14,7 @@ from app.utils.cdn.ottercloudcdn import OtterCloudCDN
 from app.utils.common import get_settings
 from app.utils.dalamud_log_analysis import analysis
 from app.utils.front import flash
-from app.utils.redis import RedisFeedBack
+from app.utils.redis import RedisFeedBack, Redis
 from app.utils.tasks import regen, flush_stg_code
 
 router = APIRouter()
@@ -71,7 +71,9 @@ async def front_admin_update():
 
 @router.get('/stg_code')
 async def front_admin_stg_code(request: Request):
-    flash(request, 'info', f'Stg Code为{Settings.stg_code}')
+    r = Redis.create_client()
+    stg_code = r.hget('settings', 'stg_code')
+    flash(request, 'info', f'Stg Code为 {stg_code}')
     return
 
 
@@ -203,7 +205,7 @@ async def front_admin_flush_cache_get(request: Request, task: str | None = None)
 @router.get('/flush_stg_code')
 async def front_admin_flush_stg_code(request: Request):
     stg_code = flush_stg_code()
-    flash(request, 'success', f'刷新Stg Code已完成，新的key为{stg_code}')
+    flash(request, 'success', f'刷新Stg Code已完成，新的key为 {stg_code}')
     return RedirectResponse(url=request.app.url_path_for("front_admin_index"), status_code=303)
 
 
