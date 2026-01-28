@@ -8,7 +8,6 @@ from functools import cache
 import requests
 
 from logs import logger
-from .redis import Redis
 from ..config import Settings
 
 
