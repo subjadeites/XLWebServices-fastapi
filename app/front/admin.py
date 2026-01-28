@@ -75,7 +75,7 @@ async def front_admin_stg_code(request: Request):
     settings = get_settings()
     stg_code = r.hget(f'{settings.redis_prefix}settings', 'stg_code')
     flash(request, 'info', f'Stg Code为 {stg_code}')
-    return
+    return RedirectResponse(url=request.app.url_path_for("front_admin_index"), status_code=303)
 
 
 # endregion
