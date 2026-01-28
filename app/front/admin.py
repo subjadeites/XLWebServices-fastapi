@@ -11,11 +11,11 @@ from fastapi.templating import Jinja2Templates
 
 from app.config import Settings
 from app.utils.cdn.ottercloudcdn import OtterCloudCDN
-from app.utils.common import get_settings, flush_stg_code
+from app.utils.common import get_settings
 from app.utils.dalamud_log_analysis import analysis
 from app.utils.front import flash
 from app.utils.redis import RedisFeedBack
-from app.utils.tasks import regen
+from app.utils.tasks import regen, flush_stg_code
 
 router = APIRouter()
 template = Jinja2Templates("templates")

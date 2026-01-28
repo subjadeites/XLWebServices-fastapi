@@ -4,10 +4,11 @@ import hashlib
 import json
 import os
 import re
-from collections import defaultdict
+import secrets
+import string
+from datetime import datetime
 from itertools import product
 from typing import Union, Tuple
-from datetime import datetime
 
 import commentjson
 from github import Github
@@ -464,3 +465,10 @@ def regen_xlassets(redis_client=None):
         f'json',
         json.dumps(integrity_json)
     )
+
+def flush_stg_code(redis_client=None) -> str:
+    if not redis_client:
+        redis_client = Redis.create_client()
+    stg_code = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
+    redis_client.hset('settings', 'stg_code', stg_code)
+    return stg_code

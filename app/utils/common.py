@@ -2,9 +2,7 @@ import codecs
 import hashlib
 import os
 import re
-import secrets
 import shutil
-import string
 from functools import cache
 
 import requests
@@ -83,11 +81,3 @@ def download_file(url, dst="", force: bool = False):
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)
     return filepath
-
-
-def flush_stg_code(redis_client=None) -> str:
-    if not redis_client:
-        redis_client = Redis.create_client()
-    stg_code = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
-    redis_client.hset('settings', 'stg_code', stg_code)
-    return stg_code
