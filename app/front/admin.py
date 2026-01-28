@@ -72,7 +72,9 @@ async def front_admin_update():
 @router.get('/stg_code')
 async def front_admin_stg_code(request: Request):
     r = Redis.create_client()
-    stg_code = r.hget('settings', 'stg_code')
+    settings = get_settings()
+    stg_code = r.hget(f'{settings.redis_prefix}settings', 'stg_code')
+    await asyncio.sleep(1)
     flash(request, 'info', f'Stg Code为 {stg_code}')
     return
 
@@ -205,6 +207,7 @@ async def front_admin_flush_cache_get(request: Request, task: str | None = None)
 @router.get('/flush_stg_code')
 async def front_admin_flush_stg_code(request: Request):
     stg_code = flush_stg_code()
+    await asyncio.sleep(1)
     flash(request, 'success', f'刷新Stg Code已完成，新的key为 {stg_code}')
     if request.headers.get('referer') and 'flush' in request.headers.get('referer'):
         return RedirectResponse(url=request.app.url_path_for("front_admin_flush_get"), status_code=303)
